@@ -3,36 +3,32 @@ import math
 import heapq
 
 
-def gcd(a, b):
-    while b:
-        a, b = b, a % b
-    return a
-
-
-def lcm(a, b):
-    if a == 0 or b == 0:
-        return 0
-    return abs(a * b) // gcd(a, b)
-
 
 def calculate_hyperperiod(tasks):
     if not tasks:
         return 0
-    periods = [task.period for task in tasks if task.period > 0]
+    periods = []
+    for task in tasks:
+        if task.period > 0:
+            period_ms = int(round(task.period * 1000))
+            periods.append(period_ms)
     if not periods:
         return 0
-    h = periods[0]
-    for i in range(1, len(periods)):
-        h = lcm(h, periods[i])
+    
+    h = 1
+    for p in periods:
+        if p > 0:
+            h = math.lcm(h, p)
     return h
 
 
 class Task:
     def __init__(self, task_id, exec_time, period, deadline):
         self.id = task_id
-        self.exec_time = int(exec_time * 1000)
-        self.period = int(period * 1000)
-        self.deadline = int(deadline * 1000)
+        # Use round() for more accurate conversion
+        self.exec_time = int(round(exec_time * 1000))
+        self.period = int(round(period * 1000))
+        self.deadline = int(round(deadline * 1000))
         self.priority = -1
         self.remaining_exec_time = 0
         self.absolute_deadline = 0
@@ -145,7 +141,7 @@ def simulate_dm(tasks):
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python3 main.py <task_file.txt>", file=sys.stderr)
+        print("Usage: python3 ece_455_final.py <task_file.txt>", file=sys.stderr)
         sys.exit(1)
 
     task_file = sys.argv[1]
