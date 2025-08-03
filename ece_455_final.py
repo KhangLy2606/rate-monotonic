@@ -1,20 +1,37 @@
+# ECE455 - Real-Time Operating Systems
+# Final Project: Deadline Monotonic Simulator
+#
+# This script simulates the Deadline Monotonic (DM) scheduling algorithm for a
+# set of periodic tasks on a single-core CPU. It determines if the task set
+# is schedulable and calculates the number of preemptions for each task
+# within the first hyperperiod.
+
 import sys
 import math
 import heapq
 
 
-
 def calculate_hyperperiod(tasks):
+    """
+    Calculates the hyperperiod for a given list of tasks.
+    The hyperperiod is the least common multiple (LCM) of the task periods.
+    It represents the time after which the scheduling pattern repeats.
+
+    Args:
+        tasks (list[Task]): A list of Task objects.
+
+    Returns:
+        int: The hyperperiod in milliseconds. Returns 0 if no tasks have periods.
+    """
     if not tasks:
         return 0
     periods = []
     for task in tasks:
         if task.period > 0:
-            period_ms = int(round(task.period * 1000))
-            periods.append(period_ms)
+            periods.append(task.period)
     if not periods:
         return 0
-    
+
     h = 1
     for p in periods:
         if p > 0:
@@ -23,6 +40,12 @@ def calculate_hyperperiod(tasks):
 
 
 class Task:
+    """
+    Represents a single periodic task in the system.
+
+    exec_time, period, deadline are stored as integers in milliseconds to avoid floating-point precision issues 
+    """
+
     def __init__(self, task_id, exec_time, period, deadline):
         self.id = task_id
         # Use round() for more accurate conversion
@@ -43,6 +66,11 @@ class Task:
 
 
 def read_tasks(filename):
+    """
+    Reads task definitions from a specified file.
+    Each line in the file should contain three comma-separated numbers:
+    execution time, period, and deadline.
+    """
     tasks = []
     try:
         with open(filename, 'r') as f:
@@ -55,26 +83,30 @@ def read_tasks(filename):
                     try:
                         e, p, d = map(float, parts)
                         if e <= 0 or p < 0 or d <= 0:
-                            print(
-                                f"Error: Execution and deadline must be positive on line {i+1}", file=sys.stderr)
                             return None
                         tasks.append(
                             Task(task_id=i, exec_time=e, period=p, deadline=d))
                     except ValueError:
-                        print(
-                            f"Error: Invalid number format on line {i+1}", file=sys.stderr)
                         return None
                 else:
-                    print(
-                        f"Error: Invalid format on line {i+1}", file=sys.stderr)
                     return None
     except FileNotFoundError:
-        print(f"Error: File '{filename}' not found.", file=sys.stderr)
         return None
     return tasks
 
 
 def simulate_dm(tasks):
+    """
+    Simulates the Deadline Monotonic scheduling algorithm.
+
+    Args:
+        tasks (list[Task]): A list of tasks to be scheduled.
+
+    Returns:
+        tuple[bool, list[int]]: A tuple containing:
+            - A boolean indicating if the schedule is feasible (True) or not (False).
+            - A list of preemption counts for each task, in original order.
+    """
 
     # Assigns priorities based on deadlines
     tasks_sorted_by_deadline = sorted(tasks, key=lambda t: t.deadline)
@@ -112,13 +144,17 @@ def simulate_dm(tasks):
         # Tracks deadline misses and preemption counts
         if running_task:
             if highest_priority_ready_tuple and highest_priority_ready_tuple[0] < running_task.priority:
+                # Task preempted
                 running_task.preemption_count += 1
                 heapq.heappush(
                     ready_queue, (running_task.priority, running_task.id, running_task))
+                # The highest-priority task becomes the running task.
                 _, _, running_task = heapq.heappop(ready_queue)
         elif highest_priority_ready_tuple:
+            # If idle, the highest-priority ready task starts running.
             _, _, running_task = heapq.heappop(ready_queue)
 
+        # Execute the running task for one time unit
         if running_task:
             running_task.remaining_exec_time -= 1
             if running_task.remaining_exec_time == 0:
@@ -127,12 +163,14 @@ def simulate_dm(tasks):
                     break
                 running_task = None
 
+    # A deadline is also missed if any task has remaining execution time at the end.
     if not deadline_missed:
         for task in tasks:
             if task.remaining_exec_time > 0:
                 deadline_missed = True
                 break
 
+    # Sort tasks back to their original order to report preemptions correctly.
     tasks_in_original_order = sorted(tasks, key=lambda t: t.id)
     preemption_counts = [t.preemption_count for t in tasks_in_original_order]
 
